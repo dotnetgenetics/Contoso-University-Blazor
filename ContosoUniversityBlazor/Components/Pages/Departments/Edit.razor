@@ -1,0 +1,227 @@
+﻿@page "/departmentupdate/{DepartmentID:int}"
+
+@using ContosoUniversityBlazor.Models
+@using ContosoUniversityBlazor.Data
+
+@rendermode InteractiveServer
+
+<PageTitle>@Title</PageTitle>
+
+<div class="container">
+    <div class="row">
+        @if (!string.IsNullOrEmpty(StatusMessage))
+        {
+            <div class="alert @StatusClass statusMessage">@StatusMessage</div>
+        }
+    </div>
+
+    <div class="row heading">
+        <h3>Update Department</h3>
+    </div>
+
+    <EditForm Enhance
+              Model="Department"
+              OnValidSubmit="OnDepartmentSubmit"
+              FormName="frmUpdateDepartment"
+              OnInvalidSubmit="HandleInvalidSubmit">
+
+        <DataAnnotationsValidator />
+        <ValidationSummary></ValidationSummary>
+
+        <div class="row mb-3">
+            <label for="name" class="col-form-label col-md-3">Department </label>
+            <div class="col-md-8">
+                <InputText id="name" class="form-control col-md-8" @bind-Value="@Department.Name" placeholder="Enter department name"></InputText>
+            </div>
+            <ValidationMessage class="offset-md-3 col-md-8 validationStyle" For="@(() => Department.Name)" />
+        </div>
+
+        <div class="row mb-3">
+            <label for="budget" class="col-form-label col-md-3">Budget</label>
+            <div class="col-md-8">
+                <InputNumber id="budget" class="form-control col-md-8" @bind-Value="@Department.Budget" placeholder="Enter department budget"></InputNumber>
+            </div>
+            <ValidationMessage class="offset-md-3 col-md-8 validationStyle" For="@(() => Department.Budget)" />
+        </div>
+
+        <div class="row mb-3">
+            <label for="startDate" class="col-form-label col-md-3">Start Date</label>
+            <div class="col-md-8">
+                <InputDate id="startDate" class="form-control col-md-8" @bind-Value="@Department.StartDate" placeholder="Enter start date"></InputDate>
+            </div>
+            <ValidationMessage class="offset-md-3 col-md-8 validationStyle" For="@(() => Department.StartDate)" />
+        </div>
+
+        <div class="row mb-3">
+            <label for="genre" class="col-form-label col-md-3">Administrator</label>
+            <div class="col-md-8">
+                <InputSelect id="genre" class="form-select col-md-8" @bind-Value="@Department.InstructorID">
+                    @foreach (var instructor in Instructors)
+                    {
+                        <option value="@instructor.ID">@instructor.FullName</option>
+                    }
+                </InputSelect>
+            </div>
+            <ValidationMessage class="offset-md-3 col-md-8 validationStyle" For="@(() => Department.InstructorID)" />
+        </div>
+
+        <div class="row">
+            <div class="col-md-3">&nbsp;</div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary submitButton">Save</button>
+            </div>
+            <div class="col-md-2">
+                <button type="reset" class="btn btn-primary submitButton" @onclick="@Reset">Clear</button>
+            </div>
+            <div class="col-md-3">
+                <button type="button" class="btn btn-info" @onclick="@NavigateToMain">Back to departments</button>
+            </div>
+        </div>
+    </EditForm>
+</div>
+
+@code {
+
+    protected string StatusMessage = string.Empty;
+    protected string StatusClass = string.Empty;
+    private string Title = "Contoso University - Update Department";
+
+    [Parameter]
+    public int DepartmentID { get; set; }
+
+    [Inject]
+    IDbContextFactory<SchoolContext> contextFactory { get; set; }
+
+    [SupplyParameterFromForm]
+    public Department Department { get; set; }
+
+    public List<Instructor> Instructors { get; set; }
+
+    [Inject]
+    public NavigationManager NavigationManager { get; set; }
+
+    public bool Updated { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        StatusClass = string.Empty;
+        StatusMessage = string.Empty;
+        Department = new Department();
+
+        PopulateAdminDropDownList();
+        var context = contextFactory.CreateDbContext();
+        var department = await context.Departments
+            .Include(i => i.Administrator)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(m => m.DepartmentID == DepartmentID);
+
+        Department = department;
+    }
+
+    protected void Reset()
+    {
+        StatusClass = string.Empty;
+        StatusMessage = string.Empty;
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Updated)
+        {
+            var context = contextFactory.CreateDbContext();
+            var department = context.Departments
+                .Include(i => i.Administrator)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.DepartmentID == DepartmentID);
+
+            PopulateAdminDropDownList();
+
+            if (department != null)
+                Department = department.Result;
+
+            Updated = false;
+        }
+
+        return base.OnAfterRenderAsync(firstRender);
+    }
+
+    private async Task OnDepartmentSubmit()
+    {
+        var context = contextFactory.CreateDbContext();
+        var departmentToUpdate = await context.Departments
+                                    .Include(i => i.Administrator)
+                                    .FirstOrDefaultAsync(m => m.DepartmentID == DepartmentID);
+
+        if (departmentToUpdate == null)
+        {
+            StatusClass = "alert-danger";
+            StatusMessage = "Unable to save changes. The department was deleted by another user.";
+        }
+        else
+        {
+            context.Entry(departmentToUpdate).Property("RowVersion").OriginalValue = Department.RowVersion;
+
+            try
+            {
+                departmentToUpdate.Name = Department.Name;
+                departmentToUpdate.Budget = Department.Budget;
+                departmentToUpdate.StartDate = Department.StartDate;
+                departmentToUpdate.InstructorID = Department.InstructorID;
+                context.Entry(departmentToUpdate).State = EntityState.Modified;
+                await context.SaveChangesAsync();
+                StatusClass = "alert-success";
+                StatusMessage = "Department successfully added to the database.";
+
+                Updated = true;
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                var exceptionEntry = ex.Entries.Single();
+                var clientValues = (Department)exceptionEntry.Entity;
+                var databaseEntry = exceptionEntry.GetDatabaseValues();
+                if (databaseEntry == null)
+                {
+                    StatusClass = "alert-danger";
+                    StatusMessage = "Unable to save changes. The department was deleted by another user.";
+                }
+                else
+                {
+                    var databaseValues = (Department)databaseEntry.ToObject();
+
+                    StatusClass = "alert-danger";
+                    StatusMessage = "The record you attempted to edit "
+                                + "was modified by another user after you got the original value. The "
+                                + "edit operation was canceled and the current values in the database "
+                                + "have been displayed. If you still want to edit this record, click "
+                                + "the Save button again. Otherwise click the Back to List hyperlink.";
+                    departmentToUpdate.RowVersion = (byte[])databaseValues.RowVersion;
+                }
+            }
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    protected void HandleInvalidSubmit()
+    {
+        StatusClass = "alert-danger";
+        StatusMessage = "There are some validation errors. Please try again.";
+    }
+
+    private void PopulateAdminDropDownList()
+    {
+        var context = contextFactory.CreateDbContext();
+        var instructorsQuery = from d in context.Instructors
+                               orderby d.LastName
+                               select d;
+
+        Instructors = new List<Instructor>();
+        foreach (var item in instructorsQuery.ToList())
+            Instructors.Add(item);
+    }
+
+    protected void NavigateToMain()
+    {
+        NavigationManager.NavigateTo("/departments");
+    }
+}

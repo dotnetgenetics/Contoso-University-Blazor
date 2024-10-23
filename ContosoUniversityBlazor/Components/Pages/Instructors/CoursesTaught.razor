@@ -1,0 +1,83 @@
+﻿@using ContosoUniversityBlazor.Models
+@using ContosoUniversityBlazor.Data
+@using ContosoUniversityBlazor.Helpers
+@rendermode InteractiveServer
+
+<div class="container">
+    <div class="row heading">
+        <h5>Courses Taught by Selected Instructor</h5>
+    </div>
+    <div class="row">
+        <table class="table table-bordered table-striped">
+            <thead class="table-primary">
+                <tr>
+                    <th></th>
+                    <th>Number</th>
+                    <th>Title</th>
+                    <th>Department</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in InstructorData.Courses)
+                {
+                    string selectedRow = string.Empty;
+                    if (item.CourseID == SelectedCourseID)
+                    {
+                        selectedRow = "table-success";
+                    }
+
+                    <tr class="@selectedRow">
+                        <td>
+                            <button class="btn btn-secondary btn-sm mb-1" @onclick="() => HandleSelectClicked(item.CourseID)">Select</button>
+                        </td>
+                        <td>@item.CourseID</td>
+                        <td>@item.Title</td>
+                        <td>@item.Department.Name</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    [Inject]
+    public IJSRuntime JSRuntime { get; set; }
+
+    [Inject]
+    IDbContextFactory<SchoolContext> contextFactory { get; set; }
+
+    public InstructorIndexData InstructorData { get; set; }
+
+    [Parameter]
+    public int InstructorID { get; set; }
+
+    [Parameter]
+    public IEnumerable<Instructor>? Instructors { get; set; } = null;
+
+    [Parameter]
+    public Func<int,Task>? OnSelectedCourseClicked { get; set; }
+
+    public int SelectedCourseID { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        InstructorData = new InstructorIndexData();
+        var context = contextFactory.CreateDbContext();
+
+        if (Instructors != null)
+        {
+            Instructor instructor = Instructors.ToList()
+                        .Where(i => i.ID == InstructorID)
+                        .Single();
+
+            InstructorData.Courses = instructor.CourseAssignments.Select(s => s.Course);
+        }
+    }
+
+    private async Task HandleSelectClicked(int id)
+    {
+        SelectedCourseID = id;
+        await this.OnSelectedCourseClicked.Invoke(id);
+    }
+}

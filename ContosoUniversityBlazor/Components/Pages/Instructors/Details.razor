@@ -1,0 +1,80 @@
+﻿@page "/instructordetail/{InstructorID:int}"
+
+@using ContosoUniversityBlazor.Models
+@using ContosoUniversityBlazor.Data
+
+@rendermode InteractiveServer
+
+<PageTitle>@Title</PageTitle>
+
+<div class="container">
+    <div class="row heading">
+        <h3>Instructor Details</h3>
+    </div>
+    <hr />
+    <br />
+    <div class="row">
+        <div class="row mb-2">
+            <label class="col-sm-2 col-form-label">Last Name</label>
+            <div class="col-sm-10">
+                <label type="text" class="form-control">@Instructor.LastName</label>
+            </div>
+        </div>
+
+        <div class="row mb-2">
+            <label class="col-sm-2 col-form-label">First Name</label>
+            <div class="col-sm-10">
+                <label type="text" class="form-control">@Instructor.FirstMidName</label>
+            </div>
+        </div>
+
+        <div class="row mb-2">
+            <label class="col-sm-2 col-form-label">Hire Date</label>
+            <div class="col-sm-10">
+                <label type="text" class="form-control">@Instructor.DisplayDate</label>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-2">&nbsp;</div>
+            <div class="col-md-10">
+                <button type="button" class="btn btn-primary" @onclick="@NavigateToMain">Back to instructors</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+
+    [Parameter]
+    public int InstructorID { get; set; }
+
+    [SupplyParameterFromForm]
+    public Instructor Instructor { get; set; }
+
+    [Inject]
+    IDbContextFactory<SchoolContext> contextFactory { get; set; }
+
+    [Inject]
+    public NavigationManager NavigationManager { get; set; }
+
+    private string Title = "Contoso University - Instructor Details";
+
+    protected override void OnParametersSet()
+    {
+        var context = contextFactory.CreateDbContext();
+        Instructor = new Instructor();
+
+        var instructor = context.Instructors
+                        .AsNoTracking()
+                        .FirstOrDefault(m => m.ID == InstructorID);
+
+        if (instructor != null)
+            Instructor = instructor;
+    }
+
+    protected void NavigateToMain()
+    {
+        NavigationManager.NavigateTo("/instructors");
+    }
+}

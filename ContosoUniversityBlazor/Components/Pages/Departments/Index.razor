@@ -1,0 +1,111 @@
+﻿@page "/departments"
+@using ContosoUniversityBlazor.Models
+@using ContosoUniversityBlazor.Data
+@using ContosoUniversityBlazor.Helpers
+
+@rendermode InteractiveServer
+
+<PageTitle>@Title</PageTitle>
+
+<div class="container">
+    <div class="row heading">
+        <h3>Contoso University Departments</h3>
+    </div>
+    <div class="row">
+        <div class="col-md-2 addDepartment">
+            <a href="/departmentadd" class="btn btn-primary btn-sm mb-1">
+                New Department
+            </a>
+        </div>
+        <div class="col-md-10" />
+    </div>
+    <div class="row">
+        <table class="table table-bordered table-striped">
+            <thead class="table-primary">
+                <tr>
+                    <th>Name</th>
+                    <th>Budget</th>
+                    <th>Start Date</th>
+                    <th>Row Version</th>
+                    <th>Administrator</th>
+                    <th></th>
+                    <th></th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var department in Departments)
+                {
+                    <tr>
+                        <td>@department.Name</td>
+                        <td>@department.DisplayBudget</td>
+                        <td>@department.DisplayDate</td>
+                        <td>@department.DisplayRowVersion</td>
+                        <td>@department.Administrator.FullName</td>
+                        <td>
+                            <a href="@($"departmentupdate/{department.DepartmentID}")" class="btn btn-info btn-sm mb-1">
+                                Edit
+                            </a>
+                        </td>
+                        <td>
+                            <a href="@($"departmentdetail/{department.DepartmentID}")" class="btn btn-primary btn-sm mb-1">
+                                Details
+                            </a>
+                        </td>
+                        <td>
+                            <button class="btn btn-danger btn-sm mb-1" @onclick="() => DeleteDepartment(department.DepartmentID)">Delete</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    [Inject]
+    public IJSRuntime JSRuntime { get; set; }
+
+    [Inject]
+    IDbContextFactory<SchoolContext> contextFactory { get; set; }
+
+    private string Title = "Contoso University - Departments";
+
+    public List<Department> Departments { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Departments = new List<Department>();
+        var context = contextFactory.CreateDbContext();
+        Departments = await context.Departments.Include(c => c.Administrator).AsNoTracking().ToListAsync();
+    }
+
+    protected async Task DeleteDepartment(int departmentID)
+    {
+        bool confirmDelete = await JSRuntime.InvokeAsync<bool>("confirm", "Delete department?");
+        if (confirmDelete)
+        {
+            var context = contextFactory.CreateDbContext();
+            var department = await context.Departments.FindAsync(departmentID);
+
+            try
+            {
+                if (department != null)
+                {
+                    if (await context.Departments.AnyAsync(m => m.DepartmentID == department.DepartmentID))
+                    {
+                        context.Departments.Remove(department);
+                        await context.SaveChangesAsync();
+                    }
+                }
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                //Log the error - show some error message :)
+            }
+
+            Departments = new List<Department>();
+            Departments = await context.Departments.Include(c => c.Administrator).AsNoTracking().ToListAsync();
+        }
+    }    
+}

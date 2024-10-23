@@ -1,0 +1,99 @@
+﻿@page "/coursedetail/{CourseID:int}"
+
+@using ContosoUniversityBlazor.Models
+@using ContosoUniversityBlazor.Data
+
+@rendermode InteractiveServer
+
+<PageTitle>@Title</PageTitle>
+
+<div class="container">
+    <div class="row heading">
+        <h3>Course Details</h3>
+    </div>
+    <hr />
+    <br />
+    <div class="row">
+        <div class="row mb-2">
+            <label class="col-sm-2 col-form-label">Course ID</label>
+            <div class="col-sm-10">
+                <label type="text" class="form-control">@Course.CourseID</label>
+            </div>
+        </div>
+
+        <div class="row mb-2">
+            <label class="col-sm-2 col-form-label">Title</label>
+            <div class="col-sm-10">
+                <label type="text" class="form-control">@Course.Title</label>
+            </div>
+        </div>
+
+        <div class="row mb-2">
+            <label class="col-sm-2 col-form-label">Credits</label>
+            <div class="col-sm-10">
+                <label type="text" class="form-control">@Course.Credits</label>
+            </div>
+        </div>
+
+        <div class="row mb-2">
+            <label class="col-sm-2 col-form-label">Department</label>
+            <div class="col-sm-10">
+                <label type="text" class="form-control">@Course.Department.Name</label>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-2">&nbsp;</div>
+            <div class="col-md-10">
+                <button type="button" class="btn btn-primary" @onclick="@NavigateToMain">Back to courses</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+
+    [Parameter]
+    public int CourseID { get; set; }
+
+    public Course Course { get; set; }
+
+    [Inject]
+    IDbContextFactory<SchoolContext> contextFactory { get; set; }
+
+    [Inject]
+    public NavigationManager NavigationManager { get; set; }
+
+    private string Title = "Contoso University - Course Detail";
+
+    protected override void OnParametersSet()
+    {
+        var context = contextFactory.CreateDbContext();
+
+        //Course? course = new Course();
+
+        //bug, will cause Object Reference Not Set To An Instance
+        //course = await context.Courses
+        //            .Include(c => c.Department)
+        //            .AsNoTracking()
+        //            .FirstOrDefaultAsync(x => x.CourseID == CourseID);
+
+        //course = context.Courses
+        //            .AsNoTracking()
+        //            .Include(c => c.Department)
+        //            .FirstOrDefault(x => x.CourseID == CourseID);
+
+        var course = context.Courses
+             .Include(c => c.Department)
+             .AsNoTracking()
+             .FirstOrDefaultAsync(x => x.CourseID == CourseID);
+
+        if (course != null)
+            Course = course.Result;
+    }
+
+    protected void NavigateToMain()
+    {
+        NavigationManager.NavigateTo("/courses");
+    }
+}

@@ -1,0 +1,291 @@
+﻿@page "/instructorupdate/{InstructorID:int}"
+
+@using ContosoUniversityBlazor.Models
+@using ContosoUniversityBlazor.Data
+
+@rendermode InteractiveServer
+
+<PageTitle>@Title</PageTitle>
+
+<div class="container">
+    <div class="row">
+        @if (!string.IsNullOrEmpty(StatusMessage))
+        {
+            <div class="alert @StatusClass statusMessage">@StatusMessage</div>
+        }
+    </div>
+
+    <div class="row heading">
+        <h3>Edit Instructor</h3>
+    </div>
+
+    <EditForm Enhance
+              Model="@Instructor"
+              OnValidSubmit="OnInstructorSubmit"
+              FormName="frmEditInstructor"
+              OnInvalidSubmit="HandleInvalidSubmit">
+
+        <DataAnnotationsValidator />
+        <ValidationSummary></ValidationSummary>
+
+        <div class="row mb-3">
+            <label for="lastname" class="col-form-label col-md-3">Last Name </label>
+            <div class="col-md-8">
+                <InputText id="lastname" class="form-control col-md-8" @bind-Value="@Instructor.LastName" placeholder="Enter last name"></InputText>
+            </div>
+            <ValidationMessage class="offset-md-3 col-md-8 validationStyle" For="@(() => Instructor.LastName)" />
+        </div>
+
+        <div class="row mb-3">
+            <label for="firstmidname" class="col-form-label col-md-3">First Name </label>
+            <div class="col-md-8">
+                <InputText id="firstmidname" class="form-control col-md-8" @bind-Value="@Instructor.FirstMidName" placeholder="Enter first mid name"></InputText>
+            </div>
+            <ValidationMessage class="offset-md-3 col-md-8 validationStyle" For="@(() => Instructor.FirstMidName)" />
+        </div>
+
+        <div class="row mb-3">
+            <label for="hireDate" class="col-form-label col-md-3">Hire Date</label>
+            <div class="col-md-8">
+                <InputDate id="hireDate" class="form-control col-md-8" @bind-Value="@Instructor.HireDate" placeholder="Enter hire date"></InputDate>
+            </div>
+            <ValidationMessage class="offset-md-3 col-md-8 validationStyle" For="@(() => Instructor.HireDate)" />
+        </div>
+
+        <div class="row mb-3">
+            <label for="officeLocation" class="col-form-label col-md-3">Office Location</label>
+            <div class="col-md-8">
+                <InputText id="officeLocation" class="form-control col-md-8" @bind-Value="@Instructor.OfficeAssignment.Location" placeholder="Enter office location"></InputText>
+            </div>
+            <ValidationMessage class="offset-md-3 col-md-8 validationStyle" For="@(() => Instructor.OfficeAssignment.Location)" />
+        </div>
+
+        <div class="row mb-3">
+            <label for="officeLocation" class="col-form-label col-md-3">Assigned Courses</label>
+            <div class="col-md-8">
+                <table class="table table-bordered table-striped">
+                    @{
+                        @:<tr>
+                            int cnt = 0;
+                            foreach (var course in Courses)
+                            {
+                                if (cnt++ % 3 == 0)
+                                {
+                                @:</tr><tr>
+                                }
+                                @:<td>
+                                    <InputCheckbox id="@course.CourseID"
+                                                   name="@course.CourseID"
+                                                   @bind-Value="course.Assigned"
+                                                   @onclick="() => AssignedCourseChanged(course.CourseID)"
+                                                   class="form-check-input" />@:&nbsp;
+                                    @course.CourseID @:  @course.Title
+                                @:</td>
+                            }
+                        @:</tr>
+                    }
+                </table>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-3">&nbsp;</div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary submitButton">Save</button>
+            </div>
+            <div class="col-md-2">
+                <button type="reset" class="btn btn-primary submitButton" @onclick="@Reset">Clear</button>
+            </div>
+            <div class="col-md-3">
+                <button type="button" class="btn btn-info" @onclick="@NavigateToMain">Back to instructors</button>
+            </div>
+        </div>
+    </EditForm>
+</div>
+
+@code {
+    protected string StatusMessage = string.Empty;
+    protected string StatusClass = string.Empty;
+    private string Title = "Contoso University - Edit Instructor";
+
+    public List<AssignedCourseData> Courses { get; set; } = new List<AssignedCourseData>();
+    private List<AssignedCoursesItems> CourseItemsSelection { get; set; } = new List<AssignedCoursesItems>();
+
+    [Inject]
+    IDbContextFactory<SchoolContext> contextFactory { get; set; }
+
+    [SupplyParameterFromForm]
+    public Instructor Instructor { get; set; } = default!;
+
+    [Inject]
+    public NavigationManager? NavigationManager { get; set; } = null;
+
+    [Parameter]
+    public int InstructorID { get; set; }
+
+    protected override void OnInitialized()
+    {
+        var context = contextFactory.CreateDbContext();
+        CourseItemsSelection = new List<AssignedCoursesItems>();
+
+        StatusClass = string.Empty;
+        StatusMessage = string.Empty;
+
+        Instructor = new Instructor();
+        Instructor.OfficeAssignment = new OfficeAssignment();
+        Instructor.CourseAssignments = new List<CourseAssignment>();
+
+        Instructor = context.Instructors
+            .Include(i => i.OfficeAssignment)
+            .Include(i => i.CourseAssignments).ThenInclude(i => i.Course)
+            .AsNoTracking()
+            .FirstOrDefault(m => m.ID == InstructorID);
+
+        foreach (var courseAssigned in Instructor.CourseAssignments)
+        {
+            CourseItemsSelection.Add(new AssignedCoursesItems() { CourseID = courseAssigned.CourseID });
+        }
+
+        PopulateAssignedCourseData(Instructor);
+    }
+
+    protected void Reset()
+    {
+        StatusClass = string.Empty;
+        StatusMessage = string.Empty;
+    }
+
+    private async void PopulateAssignedCourseData(Instructor instructor)
+    {
+        var context = contextFactory.CreateDbContext();
+        var allCourses = context.Courses;
+        var instructorCourses = new HashSet<int>(instructor.CourseAssignments.Select(c => c.CourseID));
+        var viewModel = new List<AssignedCourseData>();
+        foreach (var course in allCourses)
+        {
+            viewModel.Add(new AssignedCourseData
+            {
+                CourseID = course.CourseID,
+                Title = course.Title,
+                Assigned = instructorCourses.Contains(course.CourseID)
+            });
+        }
+
+        Courses = new List<AssignedCourseData>();
+        Courses = viewModel;
+    }
+
+    private void AssignedCourseChanged(int courseID)
+    {
+        AssignedCoursesItems courseItem = new AssignedCoursesItems();
+        courseItem.CourseID = courseID;
+
+        if (CourseItemsSelection.FirstOrDefault(x => x.CourseID == courseID) == null)
+        {
+            CourseItemsSelection.Add(courseItem);
+        }
+        else
+        {
+            var courseAssigned = CourseItemsSelection.FirstOrDefault(x => x.CourseID == courseID);
+            if (courseAssigned != null)
+                CourseItemsSelection.Remove(courseAssigned);
+        }
+    }
+
+    private async Task OnInstructorSubmit()
+    {
+        var context = contextFactory.CreateDbContext();
+        var instructorToUpdate = await context.Instructors
+                .Include(i => i.OfficeAssignment)
+                .Include(i => i.CourseAssignments)
+                    .ThenInclude(i => i.Course)
+                .FirstOrDefaultAsync(s => s.ID == InstructorID);
+
+        try
+        {
+            if (instructorToUpdate != null)
+            {
+                instructorToUpdate.LastName = Instructor.LastName;
+                instructorToUpdate.FirstMidName = Instructor.FirstMidName;
+                instructorToUpdate.HireDate = Instructor.HireDate;
+                instructorToUpdate.OfficeAssignment.Location = Instructor.OfficeAssignment.Location;
+
+                if (string.IsNullOrEmpty(instructorToUpdate.OfficeAssignment?.Location))
+                    instructorToUpdate.OfficeAssignment = null;
+
+                context.Entry(instructorToUpdate).State = EntityState.Modified;
+            }
+
+            UpdateInstructorCourses(instructorToUpdate, context);
+            await context.SaveChangesAsync();
+
+            StatusClass = "alert-success";
+            StatusMessage = "Instructor successfully added to the database.";
+        }
+        catch (DbUpdateException)
+        {
+            StatusClass = "alert-danger";
+            StatusMessage = "Unable to save changes. Try again, and if the problem persists, " +
+                            "see your system administrator.";
+        }
+
+        Instructor = context.Instructors
+            .Include(i => i.OfficeAssignment)
+            .Include(i => i.CourseAssignments).ThenInclude(i => i.Course)
+            .AsNoTracking()
+            .FirstOrDefault(m => m.ID == InstructorID);
+
+        PopulateAssignedCourseData(Instructor);
+        CourseItemsSelection = new List<AssignedCoursesItems>();
+
+        foreach (var courseAssigned in Instructor.CourseAssignments)
+        {
+            CourseItemsSelection.Add(new AssignedCoursesItems() { CourseID = courseAssigned.CourseID });
+        }
+    }
+
+    private void UpdateInstructorCourses(Instructor instructorToUpdate, SchoolContext context)
+    {
+        if (CourseItemsSelection == null)
+        {
+            instructorToUpdate.CourseAssignments = new List<CourseAssignment>();
+            return;
+        }
+
+        var instructorCourses = new HashSet<int>(instructorToUpdate.CourseAssignments.Select(c => c.Course.CourseID));
+
+        foreach (var course in context.Courses)
+        {
+            if (CourseItemsSelection.FirstOrDefault(x => x.CourseID == course.CourseID) != null)
+            {
+                if (!instructorCourses.Contains(course.CourseID))
+                    instructorToUpdate.CourseAssignments.Add(new CourseAssignment { InstructorID = instructorToUpdate.ID, CourseID = course.CourseID });
+            }
+            else
+            {
+                //course removed from current course selection, remove from db
+                if (instructorCourses.Contains(course.CourseID))
+                {
+                    CourseAssignment courseToRemove = instructorToUpdate.CourseAssignments.FirstOrDefault(i => i.CourseID == course.CourseID);
+                    context.Remove(courseToRemove);
+                }
+            }
+        }
+    }
+
+    protected void HandleInvalidSubmit()
+    {
+        StatusClass = "alert-danger";
+        StatusMessage = "There are some validation errors. Please try again.";
+    }
+
+    protected void NavigateToMain()
+    {
+        NavigationManager.NavigateTo("/instructors");
+    }
+
+    private class AssignedCoursesItems
+    {
+        public int CourseID { get; set; } = 0;
+    }
+}

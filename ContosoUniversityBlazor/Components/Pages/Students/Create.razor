@@ -1,0 +1,120 @@
+﻿@page "/studentadd"
+
+@using ContosoUniversityBlazor.Models
+@using ContosoUniversityBlazor.Data
+
+@rendermode InteractiveServer
+
+<PageTitle>@Title</PageTitle>
+
+<div class="container">
+    <div class="row">
+        @if (!string.IsNullOrEmpty(StatusMessage))
+        {
+            <div class="alert @StatusClass statusMessage">@StatusMessage</div>
+        }
+    </div>
+
+    <div class="row heading">
+        <h3>Add Student</h3>
+    </div>
+
+    <EditForm Enhance
+              Model="Student"
+              OnValidSubmit="OnStudentSubmit"
+              FormName="frmAddStudent"
+              OnInvalidSubmit="HandleInvalidSubmit">
+
+        <DataAnnotationsValidator />
+        <ValidationSummary></ValidationSummary>
+
+        <div class="row mb-3">
+            <label for="lastname" class="col-form-label col-md-3">Last Name </label>
+            <div class="col-md-8">
+                <InputText id="lastname" class="form-control col-md-8" @bind-Value="@Student.LastName" placeholder="Enter last name"></InputText>
+            </div>
+            <ValidationMessage class="offset-md-3 col-md-8 validationStyle" For="@(() => Student.LastName)" />
+        </div>
+
+        <div class="row mb-3">
+            <label for="firstmidname" class="col-form-label col-md-3">First Name </label>
+            <div class="col-md-8">
+                <InputText id="firstmidname" class="form-control col-md-8" @bind-Value="@Student.FirstMidName" placeholder="Enter first mid name"></InputText>
+            </div>
+            <ValidationMessage class="offset-md-3 col-md-8 validationStyle" For="@(() => Student.FirstMidName)" />
+        </div>
+
+        <div class="row mb-3">
+            <label for="enrollmentDate" class="col-form-label col-md-3">Enrollment Date</label>
+            <div class="col-md-8">
+                <InputDate id="enrollmentDate" class="form-control col-md-8" @bind-Value="@Student.EnrollmentDate" placeholder="Enter enrollment date"></InputDate>
+            </div>
+            <ValidationMessage class="offset-md-3 col-md-8 validationStyle" For="@(() => Student.EnrollmentDate)" />
+        </div>
+
+        <div class="row">
+            <div class="col-md-3">&nbsp;</div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary submitButton">Save</button>
+            </div>
+            <div class="col-md-2">
+                <button type="reset" class="btn btn-primary submitButton" @onclick="@Reset">Clear</button>
+            </div>
+            <div class="col-md-3">
+                <button type="button" class="btn btn-info" @onclick="@NavigateToMain">Back to students</button>
+            </div>
+        </div>
+    </EditForm>
+</div>
+
+@code {
+
+    protected string StatusMessage = string.Empty;
+    protected string StatusClass = string.Empty;
+    private string Title = "Contoso University - Add Student";
+
+    [Inject]
+    IDbContextFactory<SchoolContext> contextFactory { get; set; }
+
+    [SupplyParameterFromForm]
+    public Student Student { get; set; }
+
+    [Inject]
+    public NavigationManager NavigationManager { get; set; }
+
+    protected override void OnInitialized()
+    {
+        StatusClass = string.Empty;
+        StatusMessage = string.Empty;
+        Student = new Student();
+    }
+
+    protected void Reset()
+    {
+        StatusClass = string.Empty;
+        StatusMessage = string.Empty;
+        Student = new Student();
+    }
+
+    private async Task OnStudentSubmit()
+    {
+        var context = contextFactory.CreateDbContext();
+
+        context.Add(Student);
+        await context.SaveChangesAsync();
+        StatusClass = "alert-success";
+        StatusMessage = "Student successfully added to the database.";
+        Student = new Student();
+    }
+
+    protected void HandleInvalidSubmit()
+    {
+        StatusClass = "alert-danger";
+        StatusMessage = "There are some validation errors. Please try again.";
+    }
+
+    protected void NavigateToMain()
+    {
+        NavigationManager.NavigateTo("/students");
+    }
+}

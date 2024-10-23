@@ -1,0 +1,212 @@
+﻿@page "/courseupdate/{CourseID:int}"
+
+@using ContosoUniversityBlazor.Models
+@using ContosoUniversityBlazor.Data
+
+@rendermode InteractiveServer
+
+<PageTitle>@Title</PageTitle>
+
+<div class="container">
+    <div class="row">
+        @if (!string.IsNullOrEmpty(StatusMessage))
+        {
+            <div class="alert @StatusClass statusMessage">@StatusMessage</div>
+        }
+    </div>
+
+    <div class="row heading">
+        <h3>Update Course</h3>
+    </div>
+
+    <EditForm Enhance
+              Model="Course"
+              OnValidSubmit="OnCourseSubmit"
+              FormName="frmUpdateCourse"
+              OnInvalidSubmit="HandleInvalidSubmit">
+
+        <DataAnnotationsValidator />
+        <ValidationSummary></ValidationSummary>
+
+        <div class="row mb-3">
+            <label class="col-form-label col-md-3">Course ID</label>
+            <div class="col-md-8">
+                <label type="text" class="form-control">@Course.CourseID</label>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label for="title" class="col-form-label col-md-3">Title </label>
+            <div class="col-md-8">
+                <InputText id="title" class="form-control col-md-8" @bind-Value="@Course.Title" placeholder="Enter course title"></InputText>
+            </div>
+            <ValidationMessage class="offset-md-3 col-md-8 validationStyle" For="@(() => Course.Title)" />
+        </div>
+
+        <div class="row mb-3">
+            <label for="credits" class="col-form-label col-md-3">Credits </label>
+            <div class="col-md-8">
+                <InputNumber id="credits" class="form-control col-md-8" @bind-Value="@Course.Credits" placeholder="Enter course credits"></InputNumber>
+            </div>
+            <ValidationMessage class="offset-md-3 col-md-8 validationStyle" For="@(() => Course.Credits)" />
+        </div>
+
+        <div class="row mb-3">
+            <label for="genre" class="col-form-label col-md-3">Department </label>
+            <div class="col-md-8">
+                <InputSelect id="genre" class="form-select col-md-8" @bind-Value="@Course.DepartmentID">
+                    @foreach (var department in Departments)
+                    {
+                        <option value="@department.DepartmentID">@department.Name</option>
+                    }
+                </InputSelect>
+            </div>
+            <ValidationMessage class="offset-md-3 col-md-8 validationStyle" For="@(() => Course.DepartmentID)" />
+        </div>
+
+        <div class="row">
+            <div class="col-md-3">&nbsp;</div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary submitButton">Save</button>
+            </div>
+            <div class="col-md-2">
+                <button type="reset" class="btn btn-primary submitButton" @onclick="@Reset">Clear</button>
+            </div>
+            <div class="col-md-3">
+                <button type="button" class="btn btn-info" @onclick="@NavigateToMain">Back to courses</button>
+            </div>
+        </div>
+    </EditForm>
+</div>
+
+@code {
+
+    protected string StatusMessage = string.Empty;
+    protected string StatusClass = string.Empty;
+    private string Title = "Contoso University - Course Update";
+
+    [Parameter]
+    public int CourseID { get; set; }
+
+    public Course Course { get; set; }
+
+    [Inject]
+    IDbContextFactory<SchoolContext> contextFactory { get; set; }
+
+    [Inject]
+    public NavigationManager NavigationManager { get; set; }
+
+    public List<Department> Departments { get; set; }
+
+    public bool Updated { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        StatusClass = string.Empty;
+        StatusMessage = string.Empty;
+        Updated = false;
+
+        var context = contextFactory.CreateDbContext();
+        Course? course = new Course();
+
+        course = context.Courses
+                    .AsNoTracking()
+                    .Include(c => c.Department)
+                    .FirstOrDefault(x => x.CourseID == CourseID);
+
+        if (course != null)
+            Course = course;
+
+        PopulateDepartmentsDropDownList();
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Updated)
+        {
+            var context = contextFactory.CreateDbContext();
+            Course? course = new Course();
+
+            course = context.Courses
+                        .AsNoTracking()
+                        .Include(c => c.Department)
+                        .FirstOrDefault(x => x.CourseID == CourseID);
+
+            if (course != null)
+                Course = course;
+
+            Updated = false;
+        }
+
+        return base.OnAfterRenderAsync(firstRender);
+    }
+
+    protected void Reset()
+    {
+        StatusClass = string.Empty;
+        StatusMessage = string.Empty;
+    }
+
+    private async Task OnCourseSubmit()
+    {
+        Course? course = new Course();
+        var context = contextFactory.CreateDbContext();
+
+        var courseToUpdate = await context.Courses
+                            .AsNoTracking()
+                            .Include(c => c.Department)
+                            .FirstOrDefaultAsync(x => x.CourseID == CourseID);
+
+        try
+        {
+            if (courseToUpdate != null)
+            {
+                courseToUpdate.Title = Course.Title;
+                courseToUpdate.Credits = Course.Credits;
+                courseToUpdate.DepartmentID = Course.DepartmentID;
+                courseToUpdate.CourseID = CourseID;
+                context.Entry(courseToUpdate).State = EntityState.Modified;
+                await context.SaveChangesAsync();
+
+                Updated = true;
+            }
+        }
+        catch (DbUpdateException)
+        {
+            StatusClass = "alert-danger";
+            StatusMessage = "Unable to save changes. Try again, and if the problem persists, " +
+                            "see your system administrator.";
+            return;
+        }
+
+        StatusClass = "alert-success";
+        StatusMessage = "Course successfully updated.";
+
+        PopulateDepartmentsDropDownList();
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    protected void HandleInvalidSubmit()
+    {
+        StatusClass = "alert-danger";
+        StatusMessage = "There are some validation errors. Please try again.";
+    }
+
+    private void PopulateDepartmentsDropDownList()
+    {
+        var context = contextFactory.CreateDbContext();
+        var departmentsQuery = from d in context.Departments
+                               orderby d.Name
+                               select d;
+
+        Departments = new List<Department>();
+        foreach (var item in departmentsQuery.ToList())
+            Departments.Add(item);
+    }
+
+    protected void NavigateToMain()
+    {
+        NavigationManager.NavigateTo("/courses");
+    }
+}

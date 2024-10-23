@@ -1,0 +1,125 @@
+﻿@page "/studentdetail/{StudentID:int}"
+
+@using ContosoUniversityBlazor.Models
+@using ContosoUniversityBlazor.Data
+
+@rendermode InteractiveServer
+
+<PageTitle>@Title</PageTitle>
+
+<div class="container">
+    <div class="row heading">
+        <h3>Student Details</h3>
+    </div>
+    <hr />
+    <br />
+    <div class="row">
+        <div class="row mb-2">
+            <label class="col-sm-2 col-form-label">Last Name</label>
+            <div class="col-sm-10">
+                <label type="text" class="form-control">@Student.LastName</label>
+            </div>
+        </div>
+
+        <div class="row mb-2">
+            <label class="col-sm-2 col-form-label">First Name</label>
+            <div class="col-sm-10">
+                <label type="text" class="form-control">@Student.FirstMidName</label>
+            </div>
+        </div>
+
+        <div class="row mb-2">
+            <label class="col-sm-2 col-form-label">Enrollment Date</label>
+            <div class="col-sm-10">
+                <label type="text" class="form-control">@Student.DisplayDate</label>
+            </div>
+        </div>
+
+        <div class="row mb-2">
+            <label class="col-sm-2 col-form-label">Enrollments</label>
+            <div class="col-sm-10">
+                @if (Student != null)
+                {
+                    if (Student.Enrollments != null && Student.Enrollments.Count > 0)
+                    {
+                        <table class="table table-bordered table-striped">
+                            <thead class="table-primary">
+                                <tr>
+                                    <th>Course Title</th>
+                                    <th>Grade</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var student in Student.Enrollments)
+                                {
+                                    <tr>
+                                        <td>@student.Course.Title</td>
+                                        <td>@student.Grade</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <table class="table table-bordered table-striped">
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <div class="notEnrolled">
+                                            Student is not currently enrolled!
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    }
+                }
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-2">&nbsp;</div>
+            <div class="col-md-10">
+                <button type="button" class="btn btn-primary" @onclick="@NavigateToMain">Back to students</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+
+    [Parameter]
+    public int StudentID { get; set; }
+
+    [SupplyParameterFromForm]
+    public Student Student { get; set; }
+
+    [Inject]
+    IDbContextFactory<SchoolContext> contextFactory { get; set; }
+
+    [Inject]
+    public NavigationManager NavigationManager { get; set; }
+
+    private string Title = "Contoso University - Student Details";
+
+    protected override void OnParametersSet()
+    {
+        var context = contextFactory.CreateDbContext();
+        Student = new Student();
+
+        var student = context.Students
+            .Include(i => i.Enrollments)
+            .ThenInclude(e => e.Course)
+            .AsNoTracking()
+            .FirstOrDefault(m => m.ID == StudentID);
+
+        if (student != null)
+            Student = student;
+    }
+
+    protected void NavigateToMain()
+    {
+        NavigationManager.NavigateTo("/students");
+    }
+}

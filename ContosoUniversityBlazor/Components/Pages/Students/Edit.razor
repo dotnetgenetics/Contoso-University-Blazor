@@ -1,0 +1,191 @@
+﻿@page "/studentupdate/{StudentID:int}"
+
+@using ContosoUniversityBlazor.Models
+@using ContosoUniversityBlazor.Data
+
+@rendermode InteractiveServer
+
+<PageTitle>@Title</PageTitle>
+
+<div class="container">
+    <div class="row">
+        @if (!string.IsNullOrEmpty(StatusMessage))
+        {
+            <div class="alert @StatusClass statusMessage">@StatusMessage</div>
+        }
+    </div>
+
+    <div class="row heading">
+        <h3>Edit Student</h3>
+    </div>
+
+    <EditForm Enhance
+              Model="Student"
+              OnValidSubmit="OnStudentSubmit"
+              FormName="frmAddStudent"
+              OnInvalidSubmit="HandleInvalidSubmit">
+
+        <DataAnnotationsValidator />
+        <ValidationSummary></ValidationSummary>
+
+        <div class="row mb-3">
+            <label for="lastname" class="col-form-label col-md-3">Last Name </label>
+            <div class="col-md-8">
+                <InputText id="lastname" class="form-control col-md-8" @bind-Value="@Student.LastName" placeholder="Enter last name"></InputText>
+            </div>
+            <ValidationMessage class="offset-md-3 col-md-8 validationStyle" For="@(() => Student.LastName)" />
+        </div>
+
+        <div class="row mb-3">
+            <label for="firstmidname" class="col-form-label col-md-3">First Name </label>
+            <div class="col-md-8">
+                <InputText id="firstmidname" class="form-control col-md-8" @bind-Value="@Student.FirstMidName" placeholder="Enter first mid name"></InputText>
+            </div>
+            <ValidationMessage class="offset-md-3 col-md-8 validationStyle" For="@(() => Student.FirstMidName)" />
+        </div>
+
+        <div class="row mb-3">
+            <label for="enrollmentDate" class="col-form-label col-md-3">Enrollment Date</label>
+            <div class="col-md-8">
+                <InputDate id="enrollmentDate" class="form-control col-md-8" @bind-Value="@Student.EnrollmentDate" placeholder="Enter enrollment date"></InputDate>
+            </div>
+            <ValidationMessage class="offset-md-3 col-md-8 validationStyle" For="@(() => Student.EnrollmentDate)" />
+        </div>
+
+        <div class="row">
+            <div class="col-md-3">&nbsp;</div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary submitButton">Save</button>
+            </div>
+            <div class="col-md-2">
+                <button type="reset" class="btn btn-primary submitButton" @onclick="@Reset">Clear</button>
+            </div>
+            <div class="col-md-3">
+                <button type="button" class="btn btn-info" @onclick="@NavigateToMain">Back to students</button>
+            </div>
+        </div>
+    </EditForm>
+</div>
+
+@code {
+
+    protected string StatusMessage = string.Empty;
+    protected string StatusClass = string.Empty;
+    private string Title = "Contoso University - Edit Student";
+    public bool Updated { get; set; }
+
+    [Inject]
+    IDbContextFactory<SchoolContext> contextFactory { get; set; }
+
+    [Parameter]
+    public int StudentID { get; set; }
+
+    [SupplyParameterFromForm]
+    public Student Student { get; set; }
+
+    [Inject]
+    public NavigationManager NavigationManager { get; set; }
+
+    protected override async void OnInitialized()
+    {
+        StatusClass = string.Empty;
+        StatusMessage = string.Empty;
+
+        Student = new Student();
+
+        var context = contextFactory.CreateDbContext();
+        var student = context.Students
+            .Include(i => i.Enrollments)
+            .AsNoTracking()
+            .FirstOrDefault(m => m.ID == StudentID);
+
+        Student = student;
+    }
+
+    protected void Reset()
+    {
+        StatusClass = string.Empty;
+        StatusMessage = string.Empty;
+    }
+
+    private async Task OnStudentSubmit()
+    {
+        var context = contextFactory.CreateDbContext();
+        var studentToUpdate = await context.Students
+                                    .Include(i => i.Enrollments)
+                                    .FirstOrDefaultAsync(m => m.ID == StudentID);
+
+        if (studentToUpdate == null)
+        {
+            StatusClass = "alert-danger";
+            StatusMessage = "Unable to save changes. The student was deleted by another user.";
+        }
+        else
+        {
+            try
+            {
+                studentToUpdate.LastName = Student.LastName;
+                studentToUpdate.FirstMidName = Student.FirstMidName;
+                studentToUpdate.EnrollmentDate = Student.EnrollmentDate;
+                context.Entry(studentToUpdate).State = EntityState.Modified;
+                await context.SaveChangesAsync();
+                StatusClass = "alert-success";
+                StatusMessage = "Student successfully added to the database.";
+
+                Updated = true;
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                var exceptionEntry = ex.Entries.Single();
+                var clientValues = (Department)exceptionEntry.Entity;
+                var databaseEntry = exceptionEntry.GetDatabaseValues();
+                if (databaseEntry == null)
+                {
+                    StatusClass = "alert-danger";
+                    StatusMessage = "Unable to save changes. The student was deleted by another user.";
+                }
+                else
+                {
+                    var databaseValues = (Department)databaseEntry.ToObject();
+
+                    StatusClass = "alert-danger";
+                    StatusMessage = "The record you attempted to edit "
+                                + "was modified by another user after you got the original value. The "
+                                + "edit operation was canceled and the current values in the database "
+                                + "have been displayed. If you still want to edit this record, click "
+                                + "the Save button again. Otherwise click the Back to List hyperlink.";
+                }
+            }
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Updated)
+        {
+            var context = contextFactory.CreateDbContext();
+            var student = await context.Students
+                .Include(i => i.Enrollments)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.ID == StudentID);
+
+            if (student != null)
+                Student = student;
+
+            Updated = false;
+        }
+    }
+
+    protected void HandleInvalidSubmit()
+    {
+        StatusClass = "alert-danger";
+        StatusMessage = "There are some validation errors. Please try again.";
+    }
+
+    protected void NavigateToMain()
+    {
+        NavigationManager.NavigateTo("/students");
+    }
+}

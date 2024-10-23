@@ -1,0 +1,118 @@
+﻿@page "/students"
+@using ContosoUniversityBlazor.Models
+@using ContosoUniversityBlazor.Data
+@using ContosoUniversityBlazor.Helpers
+@using Microsoft.AspNetCore.Components.QuickGrid
+
+@rendermode InteractiveServer
+
+<PageTitle>@Title</PageTitle>
+
+<div class="container">
+    <div class="row heading">
+        <h3>Contoso University Students</h3>
+    </div>
+    <div class="row">
+        <div class="col-md-2 addStudent">
+            <a href="/studentadd" class="btn btn-primary btn-sm mb-1">
+                New Student
+            </a>
+        </div>
+        <div class="col-md-10" />
+    </div>
+    <div class="row">
+        <QuickGrid Class="table table-bordered table-striped" Items="@FilteredStudents" Pagination="@pagination">
+            <PropertyColumn Title="Last Name" Property="@(p => p.LastName)" Sortable="true">
+                <ColumnOptions>
+                    <div class="search-box">
+                        <input type="search" autofocus @bind="nameFilter" @bind:event="oninput" placeholder="Last Name..." />
+                    </div>
+                </ColumnOptions>
+            </PropertyColumn>
+            <PropertyColumn Title="First Name" Property="@(p => p.FirstMidName)" Sortable="true" />
+            <PropertyColumn Title="Enrollment Date" Property="@(p => p.EnrollmentDate)" Format="yyyy-MM-dd" Sortable="true" />
+            <TemplateColumn Title="Actions" Class="quickGridActions">
+                <a href="@($"studentupdate/{context.ID}")" class="btn btn-info btn-sm mb-1">
+                    Edit
+                </a>
+                <a href="@($"studentdetail/{context.ID}")" class="btn btn-primary btn-sm mb-1">
+                    Details
+                </a>
+                <button class="btn btn-danger btn-sm mb-1" @onclick="() => DeleteStudent(context.ID)">Delete</button>
+            </TemplateColumn>
+        </QuickGrid>
+    </div>
+    <div class="row">
+        <Paginator State="@pagination" />
+    </div>
+</div>
+
+@code {
+    private PaginationState pagination = new PaginationState { ItemsPerPage = 5 };
+    private string Title = "Contoso University - Students";
+    private IQueryable<Student>? itemsQueryable;
+    private string nameFilter = string.Empty;
+
+    [Inject]
+    public IJSRuntime JSRuntime { get; set; }
+
+    [Inject]
+    IDbContextFactory<SchoolContext> contextFactory { get; set; }
+
+    IQueryable<Student> FilteredStudents
+    {
+        get
+        {
+            IQueryable<Student>? Students = itemsQueryable;
+
+            if (!string.IsNullOrEmpty(nameFilter))
+                Students = itemsQueryable?.Where(c => c.LastName.Contains(nameFilter, StringComparison.CurrentCultureIgnoreCase));
+
+            if (Students != null)
+                return Students.AsQueryable();
+
+            return null;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var context = contextFactory.CreateDbContext();
+        var students = await context.Students
+                    .Include(m => m.Enrollments)
+                    .ToListAsync();
+
+        itemsQueryable = students.AsQueryable();
+    }
+
+    protected async Task DeleteStudent(int ID)
+    {
+        bool confirmDelete = await JSRuntime.InvokeAsync<bool>("confirm", "Delete student?");
+        if (confirmDelete)
+        {
+            var context = contextFactory.CreateDbContext();
+            var student = await context.Students
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.ID == ID);
+
+            try
+            {
+                if (student != null)
+                {
+                    context.Students.Remove(student);
+                    await context.SaveChangesAsync();
+                }
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                //Log the error - show some error message :)
+            }
+
+            var students = await context.Students
+            .Include(m => m.Enrollments)
+            .ToListAsync();
+
+            itemsQueryable = students.AsQueryable();
+        }
+    }
+}

@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.9.34728.123
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ContosoUniversityBlazor", "ContosoUniversityBlazor\ContosoUniversityBlazor.csproj", "{DD588A01-E69F-43F3-A9A0-7D764F151415}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{DD588A01-E69F-43F3-A9A0-7D764F151415}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DD588A01-E69F-43F3-A9A0-7D764F151415}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DD588A01-E69F-43F3-A9A0-7D764F151415}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DD588A01-E69F-43F3-A9A0-7D764F151415}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {698BBED8-D5B1-4849-AAB2-E2BA791D7CC7}
+	EndGlobalSection
+EndGlobal

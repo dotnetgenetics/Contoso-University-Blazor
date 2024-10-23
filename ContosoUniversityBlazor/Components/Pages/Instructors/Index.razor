@@ -1,0 +1,211 @@
+﻿@page "/instructors"
+@using ContosoUniversityBlazor.Models
+@using ContosoUniversityBlazor.Data
+@using ContosoUniversityBlazor.Helpers
+
+@rendermode InteractiveServer
+
+<PageTitle>@Title</PageTitle>
+
+<div class="container">
+    <div class="row heading">
+        <h3>Contoso University Instructors</h3>
+    </div>
+    <div class="row">
+        <div class="col-md-2 addInstructor">
+            <a href="/instructoradd" class="btn btn-primary btn-sm mb-1">
+                New Instructor
+            </a>
+        </div>
+        <div class="col-md-10" />
+    </div>
+    <div class="row">
+        <table class="table table-bordered table-striped">
+            <thead class="table-primary">
+                <tr>
+                    <th>Last Name</th>
+                    <th>First Name</th>
+                    <th>Hire Date</th>
+                    <th>Office</th>
+                    <th>Courses</th>
+                    <th colspan="4">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in InstructorData.Instructors)
+                {
+                    string selectedRow = string.Empty;
+                    if (item.ID == SelectedInstructorID)
+                    {
+                        selectedRow = "table-success";
+                    }
+
+                    <tr class="@selectedRow">
+                        <td>@item.LastName</td>
+                        <td>@item.FirstMidName</td>
+                        <td>@item.DisplayDate</td>
+                        <td>
+                            @if (item.OfficeAssignment != null)
+                            {
+                                @item.OfficeAssignment.Location
+                            }
+                        </td>
+                        <td>
+                            @{
+                                foreach (var course in item.CourseAssignments)
+                                {
+                                    @course.Course.CourseID @:  @course.Course.Title <br />
+                                }
+                            }
+                        </td>
+                        <td>
+                            <button class="btn btn-secondary btn-sm mb-1" @onclick="() => SelectedInstructor(item.ID)">Select</button>
+                        </td>
+                        <td>
+                            <a href="@($"instructorupdate/{item.ID}")" class="btn btn-info btn-sm mb-1">
+                                Edit
+                            </a>
+                        </td>
+                        <td>
+                            <a href="@($"instructordetail/{item.ID}")" class="btn btn-primary btn-sm mb-1">
+                                Details
+                            </a>
+                        </td>
+                        <td>
+                            <button class="btn btn-danger btn-sm mb-1" @onclick="() => DeleteInstructor(item.ID)">Delete</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @* Courses Taught by Selected Instructor *@
+    <div class="row">
+        @if (SelectedInstructorID > 0)
+        {
+            <CoursesTaught Instructors="@InstructorData.Instructors"
+                           OnSelectedCourseClicked="this.SelectedCourse" 
+                           InstructorID="SelectedInstructorID" />
+        }
+    </div>
+
+    @* Students Enrolled in Selected Course *@
+    <div class="row">
+        @if (SelectedCourseID > 0)
+        {
+            <StudentsEnrolled 
+                              Courses="@InstructorData.Courses"
+                              CourseID="SelectedCourseID"/>
+        }
+    </div>
+
+</div>
+
+@code {
+    [Inject]
+    public IJSRuntime JSRuntime { get; set; }
+
+    [Inject]
+    IDbContextFactory<SchoolContext> contextFactory { get; set; }
+
+    private string Title = "Contoso University - Instructors";
+
+    public InstructorIndexData InstructorData { get; set; }
+
+    public int SelectedInstructorID { get; set; } = 0;
+
+    public int SelectedCourseID { get; set; } = 0;
+
+    protected override void OnInitialized()
+    {
+        InstructorData = new InstructorIndexData();
+        var context = contextFactory.CreateDbContext();
+
+        InstructorData.Instructors = context.Instructors
+                              .Include(i => i.OfficeAssignment)
+                              .Include(i => i.CourseAssignments)
+                                .ThenInclude(i => i.Course)
+                                    .ThenInclude(i => i.Department)
+                              .OrderBy(i => i.LastName)
+                              .ToList();
+    }
+
+    private void SelectedInstructor(int instructorID)
+    {
+        SelectedInstructorID = instructorID;
+        SelectedCourseID = 0;
+
+        InstructorData = new InstructorIndexData();
+        var context = contextFactory.CreateDbContext();
+
+        InstructorData.Instructors = context.Instructors
+                              .Include(i => i.OfficeAssignment)
+                              .Include(i => i.CourseAssignments)
+                                .ThenInclude(i => i.Course)
+                                    .ThenInclude(i => i.Department)
+                              .OrderBy(i => i.LastName)
+                              .ToList();
+    }
+
+    private async Task SelectedCourse(int id)
+    {
+        SelectedCourseID = id;
+
+        if (InstructorData.Instructors != null)
+        {
+            Instructor instructor = InstructorData.Instructors.ToList()
+                        .Where(i => i.ID == SelectedInstructorID)
+                        .Single();
+
+            InstructorData.Courses = instructor.CourseAssignments.Select(s => s.Course);
+        }
+
+        await Task.Yield();
+        StateHasChanged();
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        return base.OnAfterRenderAsync(firstRender);
+    }
+
+    protected async Task DeleteInstructor(int instructorID)
+    {
+        bool confirmDelete = await JSRuntime.InvokeAsync<bool>("confirm", "Delete instructor?");
+        if (confirmDelete)
+        {
+            var context = contextFactory.CreateDbContext();
+            Instructor instructor = await context.Instructors
+                .Include(i => i.CourseAssignments)
+                .SingleAsync(i => i.ID == instructorID);
+
+            try
+            {
+                if (instructor != null)
+                {
+                    //unassigned instructor from a department
+                    var departments = await context.Departments
+                            .Where(d => d.InstructorID == instructorID)
+                            .ToListAsync();
+                    departments.ForEach(d => d.InstructorID = null);
+
+                    context.Instructors.Remove(instructor);
+                    await context.SaveChangesAsync();
+
+                    InstructorData.Instructors = context.Instructors
+                      .Include(i => i.OfficeAssignment)
+                      .Include(i => i.CourseAssignments)
+                        .ThenInclude(i => i.Course)
+                            .ThenInclude(i => i.Department)
+                      .OrderBy(i => i.LastName)
+                      .ToList();
+                }
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                //Log the error - show some error message :)
+            }
+        }
+    }
+}

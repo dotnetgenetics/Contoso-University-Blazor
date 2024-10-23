@@ -1,0 +1,93 @@
+﻿@page "/departmentdetail/{DepartmentID:int}"
+
+@using ContosoUniversityBlazor.Models
+@using ContosoUniversityBlazor.Data
+
+@rendermode InteractiveServer
+
+<PageTitle>@Title</PageTitle>
+
+<div class="container">
+    <div class="row heading">
+        <h3>Department Details</h3>
+    </div>
+    <hr />
+    <br />
+    <div class="row">
+        <div class="row mb-2">
+            <label class="col-sm-2 col-form-label">Name</label>
+            <div class="col-sm-10">
+                <label type="text" class="form-control">@Department.Name</label>
+            </div>
+        </div>
+
+        <div class="row mb-2">
+            <label class="col-sm-2 col-form-label">Budget</label>
+            <div class="col-sm-10">
+                <label type="text" class="form-control">@Department.DisplayBudget</label>
+            </div>
+        </div>
+
+        <div class="row mb-2">
+            <label class="col-sm-2 col-form-label">Start Date</label>
+            <div class="col-sm-10">
+                <label type="text" class="form-control">@Department.DisplayDate</label>
+            </div>
+        </div>
+
+        <div class="row mb-2">
+            <label class="col-sm-2 col-form-label">Row Version</label>
+            <div class="col-sm-10">
+                <label type="text" class="form-control">@Department.DisplayRowVersion</label>
+            </div>
+        </div>
+
+        <div class="row mb-2">
+            <label class="col-sm-2 col-form-label">Administrator</label>
+            <div class="col-sm-10">
+                <label type="text" class="form-control">@Department.Administrator.FullName</label>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-2">&nbsp;</div>
+            <div class="col-md-10">
+                <button type="button" class="btn btn-primary" @onclick="@NavigateToMain">Back to departments</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+
+    [Parameter]
+    public int DepartmentID { get; set; }
+
+    public Department? Department { get; set; }
+
+    [Inject]
+    IDbContextFactory<SchoolContext> contextFactory { get; set; }
+
+    [Inject]
+    public NavigationManager NavigationManager { get; set; }
+
+    private string Title = "Contoso University - Department Details";
+
+    protected override void OnParametersSet()
+    {
+        var context = contextFactory.CreateDbContext();
+
+        var department = context.Departments
+            .Include(i => i.Administrator)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(m => m.DepartmentID == DepartmentID);
+
+        if (department != null)
+            Department = department.Result;
+    }
+
+    protected void NavigateToMain()
+    {
+        NavigationManager.NavigateTo("/departments");
+    }
+}

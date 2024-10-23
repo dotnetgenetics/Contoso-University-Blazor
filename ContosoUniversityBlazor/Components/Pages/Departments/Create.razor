@@ -1,0 +1,150 @@
+﻿@page "/departmentadd"
+
+@using ContosoUniversityBlazor.Models
+@using ContosoUniversityBlazor.Data
+
+@rendermode InteractiveServer
+
+<PageTitle>@Title</PageTitle>
+
+<div class="container">
+    <div class="row">
+        @if (!string.IsNullOrEmpty(StatusMessage))
+        {
+            <div class="alert @StatusClass statusMessage">@StatusMessage</div>
+        }
+    </div>
+
+    <div class="row heading">
+        <h3>Add Department</h3>
+    </div>
+
+    <EditForm Enhance
+              Model="Department"
+              OnValidSubmit="OnDepartmentSubmit"
+              FormName="frmAddDepartment"
+              OnInvalidSubmit="HandleInvalidSubmit">
+
+        <DataAnnotationsValidator />
+        <ValidationSummary></ValidationSummary>
+
+        <div class="row mb-3">
+            <label for="name" class="col-form-label col-md-3">Department </label>
+            <div class="col-md-8">
+                <InputText id="name" class="form-control col-md-8" @bind-Value="@Department.Name" placeholder="Enter department name"></InputText>
+            </div>
+            <ValidationMessage class="offset-md-3 col-md-8 validationStyle" For="@(() => Department.Name)" />
+        </div>
+
+        <div class="row mb-3">
+            <label for="budget" class="col-form-label col-md-3">Budget</label>
+            <div class="col-md-8">
+                <InputNumber id="budget" class="form-control col-md-8" @bind-Value="@Department.Budget" placeholder="Enter department budget"></InputNumber>
+            </div>
+            <ValidationMessage class="offset-md-3 col-md-8 validationStyle" For="@(() => Department.Budget)" />
+        </div>
+
+        <div class="row mb-3">
+            <label for="startDate" class="col-form-label col-md-3">Start Date</label>
+            <div class="col-md-8">
+                <InputDate id="startDate" class="form-control col-md-8" @bind-Value="@Department.StartDate" placeholder="Enter start date"></InputDate>
+            </div>
+            <ValidationMessage class="offset-md-3 col-md-8 validationStyle" For="@(() => Department.StartDate)" />
+        </div>
+
+        <div class="row mb-3">
+            <label for="genre" class="col-form-label col-md-3">Administrator</label>
+            <div class="col-md-8">
+                <InputSelect id="genre" class="form-select col-md-8" @bind-Value="@Department.InstructorID">
+                    @foreach (var instructor in Instructors)
+                    {
+                        <option value="@instructor.ID">@instructor.FullName</option>
+                    }
+                </InputSelect>
+            </div>
+            <ValidationMessage class="offset-md-3 col-md-8 validationStyle" For="@(() => Department.InstructorID)" />
+        </div>
+
+        <div class="row">
+            <div class="col-md-3">&nbsp;</div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary submitButton">Save</button>
+            </div>
+            <div class="col-md-2">
+                <button type="reset" class="btn btn-primary submitButton" @onclick="@Reset">Clear</button>
+            </div>
+            <div class="col-md-3">
+                <button type="button" class="btn btn-info" @onclick="@NavigateToMain">Back to departments</button>
+            </div>
+        </div>
+    </EditForm>
+</div>
+
+@code {
+
+    protected string StatusMessage = string.Empty;
+    protected string StatusClass = string.Empty;
+    private string Title = "Contoso University - Add Department";
+
+    [Inject]
+    IDbContextFactory<SchoolContext> contextFactory { get; set; }
+
+    [SupplyParameterFromForm]
+    public Department Department { get; set; }
+
+    public List<Instructor> Instructors { get; set; }
+
+    [Inject]
+    public NavigationManager NavigationManager { get; set; }
+
+    protected override void OnInitialized()
+    {
+        StatusClass = string.Empty;
+        StatusMessage = string.Empty;
+        Department = new Department();
+        PopulateAdminDropDownList();
+    }
+
+    protected void Reset()
+    {
+        StatusClass = string.Empty;
+        StatusMessage = string.Empty;
+        Department = new Department();
+        PopulateAdminDropDownList();
+    }
+
+    private async Task OnDepartmentSubmit()
+    {
+        var context = contextFactory.CreateDbContext();
+
+        context.Add(Department);
+        await context.SaveChangesAsync();
+        StatusClass = "alert-success";
+        StatusMessage = "Department successfully added to the database.";
+        Department = new Department();
+        PopulateAdminDropDownList();
+    }
+
+    protected void HandleInvalidSubmit()
+    {
+        StatusClass = "alert-danger";
+        StatusMessage = "There are some validation errors. Please try again.";
+    }
+
+    private void PopulateAdminDropDownList()
+    {
+        var context = contextFactory.CreateDbContext();
+        var instructorsQuery = from d in context.Instructors
+                               orderby d.LastName
+                               select d;
+
+        Instructors = new List<Instructor>();
+        foreach (var item in instructorsQuery.ToList())
+            Instructors.Add(item);
+    }
+
+    protected void NavigateToMain()
+    {
+        NavigationManager.NavigateTo("/departments");
+    }
+}

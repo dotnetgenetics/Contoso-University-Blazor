@@ -1,0 +1,52 @@
+﻿@page "/about"
+@inject IDbContextFactory<SchoolContext> ContextFactory
+
+<PageTitle>@PageTitle</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mt-4 mb-5">
+        <h2 class="pageHeader">Student Body Statistics</h2>
+    </div>
+    <div class="row">
+        <table id="tblEnrollmentGroup" class="table table-bordered table-striped">
+            <thead>
+                <tr>
+                    <th>Enrollment Date</th>
+                    <th>Students</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in EnrollmentDateGroup)
+                {
+                    <tr>
+                        <td class="left">@item.EnrollmentDate.Value.ToShortDateString()</td>
+                        <td>@item.StudentCount</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+
+    private string PageTitle = "About Page - Contoso University";
+
+    private List<EnrollmentDateGroup> EnrollmentDateGroup { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var context = ContextFactory.CreateDbContext();
+
+        IQueryable<EnrollmentDateGroup> data =
+            from student in context.Students
+            group student by student.EnrollmentDate into dateGroup
+            select new EnrollmentDateGroup()
+            {
+                EnrollmentDate = dateGroup.Key,
+                StudentCount = dateGroup.Count()
+            };
+
+        EnrollmentDateGroup = await data.AsNoTracking().ToListAsync();
+    }
+}

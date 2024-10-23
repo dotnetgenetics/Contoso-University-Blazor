@@ -1,0 +1,73 @@
+﻿@using ContosoUniversityBlazor.Models
+@using ContosoUniversityBlazor.Data
+@using ContosoUniversityBlazor.Helpers
+@rendermode InteractiveServer
+
+<div class="container">
+    <div class="row heading">
+        <h5>Students Enrolled in Selected Course</h5>
+    </div>
+    <div class="row">
+        <table class="table table-bordered table-striped">
+            <thead class="table-primary">
+                <tr>
+                    <th>Name</th>
+                    <th>Grade</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Enrollments)
+                {
+                    <tr>                        
+                        <td>@item.Student.FullName</td>
+                        <td>@item.DisplayGrade</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    [Inject]
+    public IJSRuntime JSRuntime { get; set; }
+
+    [Inject]
+    IDbContextFactory<SchoolContext> contextFactory { get; set; }
+
+    public InstructorIndexData InstructorData { get; set; }
+
+    [Parameter]
+    public int CourseID { get; set; }
+
+    [Parameter]
+    public IEnumerable<Course>? Courses { get; set; } = null;
+
+    public ICollection<Enrollment>? Enrollments { get; set; } = null;
+
+    public int SelectedCourseID { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        InstructorData = new InstructorIndexData();
+        var context = contextFactory.CreateDbContext();
+
+        if (Courses != null)
+        {
+            var selectedCourse = Courses.ToList()
+                    .Where(x => x.CourseID == CourseID)
+                    .Single();
+
+            Enrollments = null;
+            selectedCourse.Enrollments = null;
+
+            context.Entry(selectedCourse).Collection(x => x.Enrollments).Load();
+            foreach (Enrollment enrollment in selectedCourse.Enrollments)
+            {
+                context.Entry(enrollment).Reference(x => x.Student).Load();
+            }
+
+            Enrollments = selectedCourse.Enrollments;
+        }
+    }
+}
